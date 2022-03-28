@@ -78,7 +78,6 @@ class MyDataset(data.Dataset):
             onehot_encoded = onehot_encoder.fit_transform(integer_encoded)
 
             self.labels = torch.from_numpy(onehot_encoded).float()
-            print('ora si merito2')
             #y = y.to_dense()
             
             print(x.shape)
