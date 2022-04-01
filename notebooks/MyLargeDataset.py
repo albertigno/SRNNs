@@ -12,10 +12,20 @@ import numpy as np
 import scipy.io as sio
 import h5py
 from sklearn.preprocessing import OneHotEncoder
+from PIL import Image
 
 class MyDataset(data.Dataset):
-    def __init__(self, path='load_test.mat',method = 'h',lens = 15):
-        if method=='h':
+    def __init__(self, path='load_test.mat',method = 'h',lens = 15, device='cpu'):
+        
+        
+        self.device=device
+        
+        if method=='dummy_numpy':
+            data = 1.0-1.0*(np.asarray(Image.open(path)) > 128)
+            self.images = torch.from_numpy(data).permute(2,1,0)
+            self.labels = torch.zeros(len(self.images))
+        
+        elif method=='h':
             data = h5py.File(path)
             image,label = data['image'],data['label']
             image = np.transpose(image)
@@ -96,6 +106,7 @@ class MyDataset(data.Dataset):
         #self.num_sample = int((len(self.images)//100)*100)
         self.num_sample = len(self.images)
         print('num sample: {}'.format(self.num_sample))
+        
         print(self.images.size(),self.labels.size())
 
         
@@ -107,7 +118,7 @@ class MyDataset(data.Dataset):
             y: The labels
         """
         
-        device = 'cuda:0'
+        device = self.device
         
         labels_ = np.array(y,dtype=np.int)
         sample_index = np.arange(len(labels_))
@@ -143,7 +154,7 @@ class MyDataset(data.Dataset):
         return X_batch.to(device=device), y_batch.to(device=device)
 
         
-    def __getitem__(self, index):#返回的是tensor
+    def __getitem__(self, index):
         img, target = self.images[index], self.labels[index]
         return img, target
 
