@@ -33,9 +33,9 @@ class RSNN_delay(RSNN):
         self.d_ho = Hadamard(self.num_hidden, self.num_output, bias= False)    
         
         # delay init
-        self.d_ih.weight.data = torch.nn.Parameter(torch.ones(self.num_hidden, self.num_input, device=self.device, requires_grad=False)) 
-        self.d_hh.weight.data = torch.nn.Parameter(torch.ones(self.num_hidden, self.num_hidden, device=self.device, requires_grad=False))
-        self.d_ho.weight.data = torch.nn.Parameter(torch.ones(self.num_output, self.num_hidden, device=self.device, requires_grad=False))
+        torch.nn.init.uniform_(self.d_ih.weight, 1, 15)
+        torch.nn.init.uniform_(self.d_hh.weight, 1, 15)
+        torch.nn.init.uniform_(self.d_ho.weight, 1, 15)
         
     def forward(self, input):
         

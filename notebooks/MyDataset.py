@@ -2,7 +2,7 @@
 """
 Created on Sat Jun 23 18:14:11 2018
 
-@author: yjwu
+@author: alberto
 """
 
 from __future__ import print_function
@@ -15,9 +15,8 @@ from sklearn.preprocessing import OneHotEncoder
 from PIL import Image
 
 class MyDataset(data.Dataset):
-    def __init__(self, path='load_test.mat',method = 'h',lens = 15, device='cpu'):
-        
-        
+    def __init__(self, path='load_test.mat',method = 'h', win=30, device='cpu', num_samples = None):
+
         self.device=device
         
         if method=='dummy_numpy':
@@ -76,11 +75,11 @@ class MyDataset(data.Dataset):
             data = h5py.File(path, 'r')
             image, label = data['spikes'], data['labels']
             
-            x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, lens, 700, 1.4, shuffle=False)
+            x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, 100, 700, 1.4, shuffle=False)
+            #x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, time_window, 700, 1.4, shuffle=False)
             
-            #self.images = x.to_dense()
-            self.images = x
-            #self.images = self.images.permute(0, 2, 1)  
+            self.images = x.to_dense()
+            self.images = 1*(self.images > 0).float()
             
             integer_encoded = y.cpu()
             onehot_encoder = OneHotEncoder(sparse=False)
@@ -90,8 +89,8 @@ class MyDataset(data.Dataset):
             self.labels = torch.from_numpy(onehot_encoded).float()
             #y = y.to_dense()
             
-            print(x.shape)
-            print(y.shape)
+            #print(x.shape)
+            #print(y.shape)
             #image = np.transpose(image)
             #label = np.transpose(label)
             #self.images = torch.from_numpy(image)
@@ -102,7 +101,12 @@ class MyDataset(data.Dataset):
             data = sio.loadmat(path)
             self.images = torch.from_numpy(data['image'])
             self.labels = torch.from_numpy(data['label']).float()
-            
+
+        self.images=self.images[:,:win,:]
+        
+        if num_samples is not None:
+            self.images=self.images[:num_samples,:,:]
+        
         #self.num_sample = int((len(self.images)//100)*100)
         self.num_sample = len(self.images)
         print('num sample: {}'.format(self.num_sample))
