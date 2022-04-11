@@ -13,6 +13,7 @@ import math
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 class ActFun(torch.autograd.Function):
    
@@ -55,8 +56,8 @@ class RSNN(nn.Module):
             self.num_input = 700
             self.num_output = 20
         if self.dataset.split('_')[0]=='custom':
-            self.num_input = int(self.d.split('_')[1])
-            self.num_output = int(self.d.split('_')[2])        
+            self.num_input = int(self.dataset.split('_')[1])
+            self.num_output = int(self.dataset.split('_')[2])        
 
         if tau_m!='adp':
             self.tau_m_h = nn.Parameter(torch.Tensor([tau_m]), requires_grad=False)
@@ -84,7 +85,7 @@ class RSNN(nn.Module):
     
     def forward(self, input):
         
-        h_mem = h_spike = h_sumspike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
+        h_mem = h_spike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
         o_mem = o_spike = o_sumspike = torch.zeros(self.batch_size, self.num_output, device=self.device)
             
         for step in range(self.win):
@@ -97,7 +98,7 @@ class RSNN(nn.Module):
                         
             o_mem, o_spike = self.mem_update(self.fc_ho, h_spike, o_mem, o_spike)
 
-            o_sumspike += o_spike
+            o_sumspike = o_sumspike + o_spike
         
         outputs = o_sumspike / (self.win)
         
@@ -233,7 +234,6 @@ class RSNN(nn.Module):
         
         return fig   
     
-    # TBD
     def load_model(self, modelname=None, batch_size=256, device='cpu'):
         params = torch.load('./checkpoint/'+modelname, map_location=torch.device('cpu'))
         
@@ -248,5 +248,52 @@ class RSNN(nn.Module):
         self.train_loss = params['train_loss']
         self.test_loss = params['test_loss']        
     
-    def plot_weights(self, mode='histograms'):
+    def plot_weights(self, layer = 'hh', mode='histogram'):
+        
+        if layer == 'hh':
+            w = self.fc_hh
+            name = 'hidden-to-hidden weight distribution'
+        elif layer == 'ih':
+            w = self.fc_ih
+            name = 'input-to-hidden weight distribution'
+        elif layer == 'ho':     
+            w = self.fc_ho          
+            name = 'hidden-to-output weight distribution'
+            
+        w = w.weight.data.cpu().numpy()    
+        vmin = np.min(w)
+        vmax = np.max(w)
+        
+        if mode=='histogram':
+            fig = plt.figure()
+            sns.histplot(w.reshape(1,-1)[0], bins = 200)
+            plt.xlabel('weight', fontsize=14)
+            plt.ylabel('frequency', fontsize=14)
+            plt.title(name, fontsize=16)
+            return fig
+        elif mode=='matrix':
+            fig = plt.figure(figsize=(10,10))
+            c= 'RdBu'
+            plt.imshow(w, cmap=c, vmin=vmin, vmax=vmax)
+            plt.xlabel('input', fontsize=14)
+            plt.ylabel('output', fontsize=14)
+            plt.title('weights', fontsize=16)
+            return fig    
+
+    def quantize_weights(self, bits):
+        
+        def reduce_precision(weights, bits):
+            scale = (1+bits)*(weights.max()-weights.min())/(2*bits+3)
+            m = scale*torch.round((weights/scale)*2**bits)/(2**bits)
+            return m   
+
+        with torch.no_grad():
+            self.fc_hh.weight.data = torch.nn.Parameter(reduce_precision(self.fc_hh.weight.data, 1))
+            self.fc_ih.weight.data = torch.nn.Parameter(reduce_precision(self.fc_ih.weight.data, 1))
+            self.fc_ho.weight.data = torch.nn.Parameter(reduce_precision(self.fc_ho.weight.data, 1))            
+    
+    def prune_weights(self, percentage):
+        pass
+    
+    def mask_weights(self, mask):
         pass

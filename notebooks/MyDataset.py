@@ -19,11 +19,19 @@ class MyDataset(data.Dataset):
 
         self.device=device
         
-        if method=='dummy_numpy':
+        if method=='image':
             data = 1.0-1.0*(np.asarray(Image.open(path)) > 128)
             self.images = torch.from_numpy(data).permute(2,1,0)
-            self.labels = torch.zeros(len(self.images))
-        
+            self.labels = torch.ones(len(self.images))
+            
+            print(self.labels)
+
+        elif method=='random':
+            ns= int(path.split('_')[0])
+            nn = int(path.split('_')[1])
+            self.images = torch.randint(0,2,(ns, win, nn))
+            self.labels = torch.ones((len(self.images), 10))            
+            
         elif method=='h':
             data = h5py.File(path)
             image,label = data['image'],data['label']
