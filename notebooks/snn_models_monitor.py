@@ -38,12 +38,12 @@ class RSNN_monitor(RSNN):
             
             x = input[:, step, :]
             
-            x = x.view(self.batch_size, -1)
+            i_spike = x.view(self.batch_size, -1)
             
-            self.all_x[step] = x
+            self.all_x[step] = i_spike
 
-            h_mem, h_spike = self.mem_update_rnn(self.fc_ih, self.fc_hh, x, h_spike, h_mem)       
-            o_mem, o_spike = self.mem_update(self.fc_ho, h_spike, o_mem, o_spike)
+            h_mem, h_spike = self.mem_update_rnn(i_spike, h_spike, h_mem)            
+            o_mem, o_spike = self.mem_update(h_spike, o_spike, o_mem)
             
             self.all_h_mem[step] = h_mem
             self.all_h_spike[step] = h_spike

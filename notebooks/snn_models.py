@@ -34,7 +34,7 @@ class ActFun(torch.autograd.Function):
     
 class RSNN(nn.Module):
     
-    def __init__(self, dataset='mnist', num_hidden=256, thresh=0.3, tau_m=0.83, batch_size=256, win=50, device='cuda'):
+    def __init__(self, dataset='mnist', num_hidden=256, thresh=0.3, tau_m=0.83, vreset = 0.1, batch_size=256, win=50, device='cuda'):
         super(RSNN, self).__init__()
         
         self.act_fun = ActFun.apply
@@ -44,7 +44,7 @@ class RSNN(nn.Module):
         self.win = win
         self.device = device
         self.thresh = thresh
-        
+        self.vreset = vreset
         self.dataset = dataset
         
         self.epoch = 0
@@ -69,10 +69,13 @@ class RSNN(nn.Module):
             #nn.init.normal_(self.tau_m_h, 9.0, 0.1)
             #self.decay_o = nn.Parameter(torch.Tensor(self.num_output))    
             #nn.init.uniform_(self.decay_o, 0.1, 0.9)
-            self.tau_m_o = torch.Tensor([0.83])
+            #self.tau_m_o = torch.Tensor([0.83])
+            self.tau_m_o = nn.Parameter(torch.Tensor(self.num_output))
+            nn.init.normal_(self.tau_m_o, 0.83, 0.1)
         
         
         self.acc = list() # store accuracy every time test() is called
+        
         self.train_loss = list()
         self.test_loss = list()
         
@@ -92,11 +95,10 @@ class RSNN(nn.Module):
             
             x = input[:, step, :]
             
-            x = x.view(self.batch_size, -1)
+            i_spike = x.view(self.batch_size, -1)
 
-            h_mem, h_spike = self.mem_update_rnn(self.fc_ih, self.fc_hh, x, h_spike, h_mem)
-                        
-            o_mem, o_spike = self.mem_update(self.fc_ho, h_spike, o_mem, o_spike)
+            h_mem, h_spike = self.mem_update_rnn(i_spike, h_spike, h_mem)            
+            o_mem, o_spike = self.mem_update(h_spike, o_spike, o_mem)
 
             o_sumspike = o_sumspike + o_spike
         
@@ -104,23 +106,23 @@ class RSNN(nn.Module):
         
         return outputs        
     
-    def mem_update(self, operation, x, mem, spike):
+    def mem_update(self, i_spike, o_spike, mem):
         alpha = torch.exp(-1. / self.tau_m_o).to(self.device)
-        mem = mem * alpha * (1 - spike) + operation(x)
-        spike = self.act_fun(mem)
+        mem = mem * alpha * (1 - o_spike) + self.fc_ho(i_spike) - o_spike*self.vreset
+        o_spike = self.act_fun(mem)
         mem = mem*(mem<self.thresh)
-        return mem, spike
+        return mem, o_spike
     
-    def mem_update_rnn(self, operation1, operation2, x, h_spike, mem):
+    def mem_update_rnn(self, i_spike, o_spike, mem):
         beta= 0.1
         alpha = torch.exp(-1. / self.tau_m_h).to(self.device)
-        a = operation1(x)
-        b = operation2(h_spike)
-        c = mem * alpha * (1-h_spike) - h_spike*beta
+        a = self.fc_ih(i_spike) # process spikes from input
+        b = self.fc_hh(o_spike) # process recurrent spikes
+        c = mem * alpha * (1-o_spike) - o_spike*self.vreset
         mem = a + b + c
-        spike = self.act_fun(mem)
+        o_spike = self.act_fun(mem)
         mem = mem*(mem<self.thresh)
-        return mem, spike
+        return mem, o_spike
     
     # TBD
         
@@ -194,6 +196,7 @@ class RSNN(nn.Module):
             'dataset': self.dataset,
             'num_hidden': self.num_hidden,
             'thresh':self.thresh,
+            'vreset':self.vreset,
             'win': self.win
         }         
         
@@ -242,7 +245,7 @@ class RSNN(nn.Module):
         else:
             tau_m = 0.8305
         
-        self.__init__(params['dataset'], params['num_hidden'], params['thresh'], tau_m, batch_size, params['win'], device)
+        self.__init__(params['dataset'], params['num_hidden'], params['thresh'], tau_m, params['vreset'], batch_size, params['win'], device)
         self.load_state_dict(params['net'])
         self.acc = params['acc_record'] 
         self.train_loss = params['train_loss']
@@ -295,5 +298,112 @@ class RSNN(nn.Module):
     def prune_weights(self, percentage):
         pass
     
-    def mask_weights(self, mask):
-        pass
+    def mask_weights(self, layer, mask, override=False, trainable=True):
+        #print(mask)
+        #print(self.fc_hh.weight.data)
+        if layer.weight.data.shape == mask.shape:    
+            new_weight = mask if override else self.fc_hh.weight.data * mask
+            layer.weight = torch.nn.Parameter(new_weight, requires_grad=trainable)             
+
+        else:
+            print('Mask weights failed: dimension mismatch')
+    
+    
+# Eexperimental class for training with multiple delays
+
+class RSNN_d(RSNN):
+    
+    def define_operations(self):
+        self.fc_ih_0 = nn.Linear(self.num_input, self.num_hidden, bias= False)
+        self.fc_ih_2 = nn.Linear(self.num_input, self.num_hidden, bias= False)
+        self.fc_ih_4 = nn.Linear(self.num_input, self.num_hidden, bias= False)
+        self.fc_hh = nn.Linear(self.num_hidden, self.num_hidden, bias= False)
+        self.fc_ho = nn.Linear(self.num_hidden, self.num_output, bias= False)    
+        
+        self.max_d = 9
+        
+    def forward(self, input):
+        
+        h_mem = h_spike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
+        o_mem = o_spike = o_sumspike = torch.zeros(self.batch_size, self.num_output, device=self.device)
+        
+        extended_input = torch.zeros(self.batch_size, self.win+self.max_d, self.num_input, device=self.device)
+        
+        extended_input[:, self.max_d:, :] = input
+        
+        middle = int(self.max_d/2.0)
+        
+        for step in range(self.max_d, self.win+self.max_d):
+            
+            x_0 = extended_input[:, step, :]
+            x_2 = extended_input[:, step-middle, :]
+            x_4 = extended_input[:, step-self.max_d, :]
+
+            x_0_spike = x_0.view(self.batch_size, -1)
+            x_2_spike = x_2.view(self.batch_size, -1)
+            x_4_spike = x_4.view(self.batch_size, -1)
+
+            h_mem, h_spike = self.mem_update_rnn(x_0_spike, x_2_spike, x_4_spike, h_spike, h_mem)            
+            o_mem, o_spike = self.mem_update(h_spike, o_spike, o_mem)
+
+            o_sumspike = o_sumspike + o_spike
+        
+        outputs = o_sumspike / (self.win)
+        
+        return outputs        
+    
+    def mem_update(self, i_spike, o_spike, mem):
+        alpha = torch.exp(-1. / self.tau_m_o).to(self.device)
+        mem = mem * alpha * (1 - o_spike) + self.fc_ho(i_spike) - o_spike*self.vreset
+        o_spike = self.act_fun(mem)
+        mem = mem*(mem<self.thresh)
+        return mem, o_spike
+    
+    def mem_update_rnn(self, x_0, x_2, x_4, o_spike, mem):
+        beta= 0.1
+        alpha = torch.exp(-1. / self.tau_m_h).to(self.device)
+        a0 = self.fc_ih_0(x_0) # process spikes from input
+        a2 = self.fc_ih_2(x_2)
+        a4 = self.fc_ih_4(x_4)
+        
+        b = self.fc_hh(o_spike) # process recurrent spikes
+        c = mem * alpha * (1-o_spike) - o_spike*self.vreset
+        mem = a0 + a2 + a4 + b + c
+        o_spike = self.act_fun(mem)
+        mem = mem*(mem<self.thresh)
+        return mem, o_spike     
+    
+    def plot_weights(self, w, layer = 'hh', mode='histogram'):
+        
+        if layer == 'hh':
+            w = self.fc_hh
+            name = 'hidden-to-hidden weight distribution'
+        elif layer == 'ih':
+            name = 'input-to-hidden weight distribution'
+        elif layer == 'ho':     
+            w = self.fc_ho          
+            name = 'hidden-to-output weight distribution'
+            
+        w = w.weight.data.cpu().numpy()    
+        vmin = np.min(w)
+        vmax = np.max(w)
+        
+        if mode=='histogram':
+            fig = plt.figure()
+            sns.histplot(w.reshape(1,-1)[0], bins = 200)
+            plt.xlabel('weight', fontsize=14)
+            plt.ylabel('frequency', fontsize=14)
+            plt.title(name, fontsize=16)
+            return fig
+        elif mode=='matrix':
+            fig = plt.figure(figsize=(10,10))
+            c= 'RdBu'
+            plt.imshow(w, cmap=c, vmin=vmin, vmax=vmax)
+            plt.xlabel('input', fontsize=14)
+            plt.ylabel('output', fontsize=14)
+            plt.title('weights', fontsize=16)
+            return fig      
+    
+    
+    
+        
