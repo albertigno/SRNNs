@@ -47,7 +47,6 @@ class MyDataset(data.Dataset):
             self.labels = torch.from_numpy(data['label']).float()
             self.images = self.images.permute(0,3,1,2,4)
 
-
         elif method=='nmnist_h':
             data = h5py.File(path)
             image, label = data['image'], data['label']
@@ -80,10 +79,14 @@ class MyDataset(data.Dataset):
             self.images = self.images.permute(0, 2, 3, 4, 1)  
             print("final shape of images: " + str(self.images.shape))
         elif method=='hd_digits':
+
             data = h5py.File(path, 'r')
             image, label = data['spikes'], data['labels']
             
-            x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, 100, 700, 1.4, shuffle=False)
+            # we take first half of the real dataset in shd, because activity second half is almost zero
+            # time = 1.4
+            
+            x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, 2*win, 700, 1.4, shuffle=False)
             #x, y = self.sparse_data_generator_from_hdf5_spikes(image, label, time_window, 700, 1.4, shuffle=False)
             
             self.images = x.to_dense()

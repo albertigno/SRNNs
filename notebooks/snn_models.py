@@ -269,7 +269,8 @@ class RSNN(nn.Module):
         
         if mode=='histogram':
             fig = plt.figure()
-            sns.histplot(w.reshape(1,-1)[0], bins = 200)
+            #sns.histplot(w.reshape(1,-1)[0], bins = 200)
+            sns.kdeplot(w.reshape(1,-1)[0], bins = 200)
             plt.xlabel('weight', fontsize=14)
             plt.ylabel('frequency', fontsize=14)
             plt.title(name, fontsize=16)
