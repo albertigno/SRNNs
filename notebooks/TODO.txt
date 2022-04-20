@@ -1,0 +1,11 @@
+TODO:
+
+marshalling dvs to frames
+spike regularization 
+dropout
+spike count
+standardize plot_weights
+conf_matrix
+srnn animation
+sound to spike (cochlea model)
+corradi's delay model (for later)
