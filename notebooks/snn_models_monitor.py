@@ -39,7 +39,11 @@ class RSNN_monitor(RSNN):
         
         for step in range(self.win):
             
-            x = input[:, step, :]
+            # fix this
+            if self.dataset=='shd':
+                x = input[:, step, :]
+            else:
+                x = input[:, :, :, :, step]
             
             i_spike = x.view(self.batch_size, -1)
             
@@ -158,6 +162,7 @@ class RSNN_monitor(RSNN):
         return fig
     
     def animate_spikes(self):
+        pass
         
         
         
