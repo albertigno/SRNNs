@@ -1,11 +1,14 @@
 TODO:
 
-marshalling dvs to frames
-spike regularization 
+marshalling dvs to frames -> matlab
 dropout
-spike count
-standardize plot_weights
 conf_matrix
 srnn animation
 sound to spike (cochlea model)
+
+DONE:
+spike regularization, spike count (ok)
+standardize plot_weights (ok)
+
+LATER:
 corradi's delay model (for later)

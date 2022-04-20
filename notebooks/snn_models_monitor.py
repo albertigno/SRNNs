@@ -11,6 +11,7 @@ import torch.nn as nn
 from torch import Tensor
 import math
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from snn_models import *
 
@@ -25,8 +26,10 @@ class RSNN_monitor(RSNN):
     
     def forward(self, input):
         
-        h_mem = h_spike = self.h_sumspike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
+        h_mem = h_spike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
         o_mem = o_spike = o_sumspike = torch.zeros(self.batch_size, self.num_output, device=self.device)
+        
+        self.h_sumspike = torch.tensor(0.0)
         
         self.all_x = torch.zeros(self.win, self.batch_size, self.num_input, device=self.device)
         self.all_h_mem = torch.zeros(self.win, self.batch_size, self.num_hidden, device=self.device)
@@ -50,7 +53,7 @@ class RSNN_monitor(RSNN):
             self.all_o_mem[step] = o_mem
             self.all_o_spike[step] = o_spike
             
-            self.h_sumspike = h_spike + self.h_sumspike
+            self.h_sumspike = self.h_sumspike + h_spike.sum()
             o_sumspike = o_spike + o_sumspike
             
         outputs = o_sumspike / (self.win)
@@ -151,4 +154,10 @@ class RSNN_monitor(RSNN):
         
         plt.ylabel('Potential (mV)')
         plt.xlabel('Time (ms)')           
-        pass
+        
+        return fig
+    
+    def animate_spikes(self):
+        
+        
+        

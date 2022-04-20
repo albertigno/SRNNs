@@ -250,7 +250,7 @@ class RSNN(nn.Module):
         self.train_loss = params['train_loss']
         self.test_loss = params['test_loss']        
 
-    def plot_w(self, w, mode='histogram', ):
+    def plot_weights(self, w, mode='histogram', ):
         
         name='weight distribution'
         
@@ -269,8 +269,11 @@ class RSNN(nn.Module):
         vmax = np.max(w)
         
         if mode=='histogram':
-            fig = plt.figure()
-            sns.histplot(w.reshape(1,-1)[0], bins = 200)
+            if self.device.type == 'cpu':
+                w = list(w.reshape(1,-1)[0])
+                n, bins, fig = plt.hist(w, bins=200)
+            else:
+                fig = sns.histplot(w.reshape(1,-1)[0], bins = 200)
             plt.xlabel('weight', fontsize=14)
             plt.ylabel('frequency', fontsize=14)
             plt.title(name, fontsize=16)
