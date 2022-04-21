@@ -72,6 +72,7 @@ class RSNN(nn.Module):
         
         self.train_loss = list()
         self.test_loss = list()
+        self.test_spk_count = list()
         
         self.define_operations()
     
@@ -185,6 +186,12 @@ class RSNN(nn.Module):
                 self.acc.append([self.epoch, acc]) 
                 self.test_loss.append([self.epoch, total_loss_test / total])               
 
+        if self.test_spk_count == []:
+            self.test_spk_count.append([self.epoch, total_spk_count * (self.batch_size / total)]) 
+        else:
+            if self.test_spk_count[-1][0] < self.epoch:
+                self.test_spk_count.append([self.epoch, total_spk_count * (self.batch_size / total)])                 
+                
         print('avg spk_count per neuron for all {} timesteps {}'.format(self.win, total_spk_count * (self.batch_size / total)))   
         print('Test Accuracy of the model on the test samples: %.3f' % (acc))
 
@@ -196,6 +203,7 @@ class RSNN(nn.Module):
             'acc_record': self.acc,
             'train_loss': self.train_loss,
             'test_loss': self.test_loss,
+            'test_spk' : self.test_spk_count,
             'dataset': self.dataset,
             'num_hidden': self.num_hidden,
             'thresh':self.thresh,
@@ -240,8 +248,8 @@ class RSNN(nn.Module):
         
         return fig   
     
-    def load_model(self, modelname=None, batch_size=256, device='cpu'):
-        params = torch.load('./checkpoint/'+modelname, map_location=torch.device('cpu'))
+    def load_model(self, modelname=None, location = '', batch_size=256, device='cpu'):
+        params = torch.load('./checkpoint'+location+'/'+modelname, map_location=torch.device('cpu'))
         
         if len(params['net']['tau_m_h'])>1:
             tau_m = 'adp'
@@ -252,7 +260,10 @@ class RSNN(nn.Module):
         self.load_state_dict(params['net'])
         self.acc = params['acc_record'] 
         self.train_loss = params['train_loss']
-        self.test_loss = params['test_loss']        
+        self.test_loss = params['test_loss']     
+        
+        if 'test_spk' in params.keys():
+            self.test_spk_count = params['test_spk']
 
     def plot_weights(self, w, mode='histogram', ):
         
@@ -335,6 +346,8 @@ class RSNN_d(RSNN):
         h_mem = h_spike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
         o_mem = o_spike = o_sumspike = torch.zeros(self.batch_size, self.num_output, device=self.device)
         
+        self.h_sumspike = torch.tensor(0.0) # for spike-regularization
+        
         extended_input = torch.zeros(self.batch_size, self.win+self.max_d, self.num_input, device=self.device)
         
         extended_input[:, self.max_d:, :] = input
@@ -353,7 +366,8 @@ class RSNN_d(RSNN):
 
             h_mem, h_spike = self.mem_update_rnn(x_0_spike, x_2_spike, x_4_spike, h_spike, h_mem)            
             o_mem, o_spike = self.mem_update(h_spike, o_spike, o_mem)
-
+            
+            self.h_sumspike = self.h_sumspike + h_spike.sum()
             o_sumspike = o_sumspike + o_spike
         
         outputs = o_sumspike / (self.win)
@@ -407,6 +421,10 @@ class RSNN_d(RSNN):
     
     def pool_delays(self):
         
+        '''
+        Create one delay per synapse in multi-delay model, by choosing the one with highest absolute value
+        '''
+        
         q = torch.abs(torch.stack([self.fc_ih_0.weight.data, self.fc_ih_2.weight.data, self.fc_ih_4.weight.data]))
         
         q_argmax = torch.argmax(q, dim=0)
@@ -418,8 +436,6 @@ class RSNN_d(RSNN):
         self.mask_weights(self.fc_ih_0, m0, override=False, trainable=False)
         self.mask_weights(self.fc_ih_2, m2, override=False, trainable=False)
         self.mask_weights(self.fc_ih_4, m4, override=False, trainable=False)
-    
-    
     
 class RSNN_f(RSNN):    
 

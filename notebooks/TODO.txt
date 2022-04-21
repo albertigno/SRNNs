@@ -1,9 +1,10 @@
 TODO:
 
-marshalling dvs to frames -> matlab
+Fix GPU issue when saving model
+automatic creation and loading of grid for experiments?
 dropout
 conf_matrix
-srnn animation
+srnn animation (almost there)
 sound to spike (cochlea model)
 
 DONE:
@@ -12,3 +13,14 @@ standardize plot_weights (ok)
 
 LATER:
 corradi's delay model (for later)
+conv model as class (maybe create an abstract SNN model that encompasses common features with RNNs)
+
+
+
+OTHER:
+marshalling dvs to frames -> matlab
+
+
+SPINNAKER:
+consistency of different responses to SHD for every size
+conv
