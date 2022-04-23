@@ -224,6 +224,11 @@ class RSNN(nn.Module):
         weights_biases = []
         snn_state_dict = self.state_dict()
         
+        with open(layers_location+'/model_info', 'a') as logs:
+            spk = self.test_spk_count[-1][1].detach().cpu().numpy()
+            logs.write("avg spk neuron/sample {}".format(spk)) 
+            logs.write("\navg spk neuron/timestep {}".format(spk*(self.num_hidden/self.win)))  
+        
         for k in snn_state_dict:
             np.savez(layers_location+'/'+k,snn_state_dict[k].data.cpu().numpy())
             weights_biases.append(snn_state_dict[k].data.cpu().numpy())        

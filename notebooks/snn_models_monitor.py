@@ -24,7 +24,7 @@ class RSNN_monitor(RSNN):
         self.fc_hh = nn.Linear(self.num_hidden, self.num_hidden, bias= False)
         self.fc_ho = nn.Linear(self.num_hidden, self.num_output, bias= False)
         
-        self.i_drop = nn.Dropout(p=0.0)
+        self.i_drop = nn.Dropout(p=0.1)
     
     def forward(self, input):
         
