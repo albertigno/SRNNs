@@ -22,7 +22,9 @@ class RSNN_monitor(RSNN):
         
         self.fc_ih = nn.Linear(self.num_input, self.num_hidden, bias= False)
         self.fc_hh = nn.Linear(self.num_hidden, self.num_hidden, bias= False)
-        self.fc_ho = nn.Linear(self.num_hidden, self.num_output, bias= False)        
+        self.fc_ho = nn.Linear(self.num_hidden, self.num_output, bias= False)
+        
+        self.i_drop = nn.Dropout(p=0.0)
     
     def forward(self, input):
         
@@ -39,13 +41,11 @@ class RSNN_monitor(RSNN):
         
         for step in range(self.win):
             
-            # fix this
-            if self.dataset=='shd':
-                x = input[:, step, :]
-            else:
-                x = input[:, :, :, :, step]
+            x = input[:, step, :]
             
             i_spike = x.view(self.batch_size, -1)
+            
+            #i_spike = self.i_drop(i_spike)
             
             self.all_x[step] = i_spike
 

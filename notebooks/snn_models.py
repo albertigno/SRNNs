@@ -34,7 +34,7 @@ class ActFun(torch.autograd.Function):
     
 class RSNN(nn.Module):
     
-    def __init__(self, dataset='mnist', num_hidden=256, thresh=0.3, tau_m=0.83, vreset = 0.1, batch_size=256, win=50, device='cuda'):
+    def __init__(self, dataset='nmnist', num_hidden=256, thresh=0.3, tau_m=0.83, vreset = 0.0, batch_size=256, win=50, device='cuda'):
         super(RSNN, self).__init__()
         
         self.act_fun = ActFun.apply
@@ -49,7 +49,7 @@ class RSNN(nn.Module):
         
         self.epoch = 0
         
-        if self.dataset=='mnist':
+        if self.dataset=='nmnist':
             self.num_input = 34*34*2
             self.num_output = 10
         if self.dataset=='shd':
@@ -89,12 +89,8 @@ class RSNN(nn.Module):
         self.h_sumspike = torch.tensor(0.0) # for spike-regularization
             
         for step in range(self.win):
-            
-            # fix this
-            if self.dataset=='shd':
-                x = input[:, step, :]
-            else:
-                x = input[:, :, :, :, step]
+
+            x = input[:, step, :]
             
             i_spike = x.view(self.batch_size, -1)
 
@@ -157,15 +153,21 @@ class RSNN(nn.Module):
         self.train_loss.append([self.epoch, total_loss_train / total]) 
 
     def test(self, test_loader = None, criterion=None):
+        
+        self.save_model()
+        
         correct = 0
         total = 0
         total_loss_test = 0
         total_spk_count = 0
         
+        snn_cpu = RSNN() # copy of self, doing this to always evaluate on cpu
+        snn_cpu.load_model('rsnn', batch_size= self.batch_size)
+        
         for images, labels in test_loader:
-            images = images.float().to(self.device)
-            labels = labels.float().to(self.device)
-            outputs = self(images)
+            images = images.float()
+            labels = labels.float()
+            outputs = snn_cpu(images)
             spk_count = self.h_sumspike / (self.batch_size * self.num_hidden)
             loss = criterion(outputs, labels)
             _, predicted = torch.max(outputs.data, 1)

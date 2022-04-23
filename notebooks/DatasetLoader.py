@@ -14,7 +14,7 @@ import h5py
 from sklearn.preprocessing import OneHotEncoder
 from PIL import Image
 
-class MyDataset(data.Dataset):
+class DatasetLoader(data.Dataset):
     def __init__(self, path='load_test.mat',method = 'h', win=30, device='cpu', num_samples = None):
 
         self.device=device
@@ -41,21 +41,11 @@ class MyDataset(data.Dataset):
             self.images =  self.images[:,:,:,:,:]
             self.labels = torch.from_numpy(label).float()
 
-        elif method=='nmnist_r':
-            data = sio.loadmat(path)
-            self.images = torch.from_numpy(data['image'])
-            self.labels = torch.from_numpy(data['label']).float()
-            self.images = self.images.permute(0,3,1,2,4)
-
-        elif method=='nmnist_h':
-            data = h5py.File(path)
-            image, label = data['image'], data['label']
-            image = np.transpose(image)
-            label = np.transpose(label)
-            self.images = torch.from_numpy(image)
-            self.images = self.images[:, :, :, :, :]
-            self.labels = torch.from_numpy(label).float()
-            self.images = self.images.permute(0, 3, 1, 2, 4)
+        elif method=='nmnist':
+            data = h5py.File(path, 'r')
+            image, label = data[list(data.keys())[0]], data[list(data.keys())[1]]
+            self.images = torch.from_numpy(np.array(image))
+            self.labels = torch.from_numpy(np.array(label)).float()
             
         elif method=='emd':
             data = sio.loadmat(path)
@@ -78,7 +68,7 @@ class MyDataset(data.Dataset):
             self.labels = torch.from_numpy(label).float()
             self.images = self.images.permute(0, 2, 3, 4, 1)  
             print("final shape of images: " + str(self.images.shape))
-        elif method=='hd_digits':
+        elif method=='shd':
 
             data = h5py.File(path, 'r')
             image, label = data['spikes'], data['labels']
@@ -91,6 +81,7 @@ class MyDataset(data.Dataset):
             
             self.images = x.to_dense()
             self.images = 1*(self.images > 0).float()
+            #self.images = 1*(self.images > 1).float()
             
             integer_encoded = y.cpu()
             onehot_encoder = OneHotEncoder(sparse=False)
@@ -131,6 +122,8 @@ class MyDataset(data.Dataset):
         Args:
             X: The data ( sample x event x 2 ) the last dim holds (time,neuron) tuples
             y: The labels
+            
+            Author: F. Zenke
         """
         
         device = self.device
