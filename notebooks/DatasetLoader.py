@@ -44,7 +44,8 @@ class DatasetLoader(data.Dataset):
         elif method=='nmnist':
             data = h5py.File(path, 'r')
             image, label = data[list(data.keys())[0]], data[list(data.keys())[1]]
-            self.images = torch.from_numpy(np.array(image))
+            
+            self.images = torch.from_numpy(np.array(image)).to(device)
             self.labels = torch.from_numpy(np.array(label)).float()
             
         elif method=='emd':
