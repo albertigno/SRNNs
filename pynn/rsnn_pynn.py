@@ -14,29 +14,29 @@ import os
 
 class RSNN_PyNN():
     
-    def __init__(self, sim, timestep =1.0, dataset='mnist', modelname='256/', num_to_test= 20):
+    def __init__(self, sim, timestep =1.0, dataset='mnist', modelname='256/', num_to_test= 20, record_hidden = True):
         
         self.sim = sim
-        self.name = dataset
+        self.name = dataset +'_' +modelname
         self.timestep = timestep
         self.num_to_test = num_to_test
         self.sim.setup(timestep, min_delay=1.0, max_delay=2.0)
-        
+       
         weights = []
+        weights_path = './../notebooks/checkpoint/'+self.name
+        weights.append(np.load(weights_path+'fc_ih.weight.npz')['arr_0'])
+        weights.append(np.load(weights_path+'fc_hh.weight.npz')['arr_0'])
+        weights.append(np.load(weights_path+'fc_ho.weight.npz')['arr_0'])     
         
-        if self.name=='heidelberg':
+        self.n_h = len(weights[0])
+             
+        if dataset=='shd':
             self.win = 50
             self.next_sample_delay = 30
             self.sample_size = 700
             input_file = "./input_spiketrains/heidelberg_{}_delay_{}.json".format(self.num_to_test, self.next_sample_delay)
-            weights_path = './models/heidelberg_'+modelname
-            weights.append(np.load(weights_path+'fc_ih.weight.npz')['arr_0'])
-            weights.append(np.load(weights_path+'fc_hh.weight.npz')['arr_0'])
-            weights.append(np.load(weights_path+'fc_ho.weight.npz')['arr_0'])
-
             v_th_h = 0.77
             off = 0.34   
-
             inicio = 0
         
         else:
@@ -44,10 +44,6 @@ class RSNN_PyNN():
             self.next_sample_delay = 25
             self.sample_size = 34*34*2
             input_file = "./input_spiketrains/nmnist_{}_delay_{}.json".format(self.num_to_test, self.next_sample_delay)
-            weights_path = './models/nmnist_'+modelname
-            weights.append(np.load(weights_path+'fc_ih.weight.npz')['arr_0'])
-            weights.append(np.load(weights_path+'fc_hh.weight.npz')['arr_0'])
-            weights.append(np.load(weights_path+'fc_ho.weight.npz')['arr_0'])
             v_th_h = 0.55
             off = 0.3
 
@@ -91,7 +87,6 @@ class RSNN_PyNN():
 
         h_pop = self.sim.Population(1, sim.IF_cond_exp(**cellparams_h))
         
-        
 
         self.sim.Projection(h_pop,self.liquid_pop, connector=sim.AllToAllConnector(), synapse_type=sim.StaticSynapse(weight=5.0, delay=1.0),
                             receptor_type='inhibitory')
@@ -104,12 +99,14 @@ class RSNN_PyNN():
         h_pop.initialize(v=off) 
 
         self.output_pop.record(['spikes'])
-
+        
+        if record_hidden:
+            self.liquid_pop.record(['spikes'])
         
     def set_input_population(self, spk_per_timestep=None): 
         
         if spk_per_timestep is not None:
-            spike_times = [[*np.random.choice(np.arange(0,self.sample_size), spk_per_timestep, replace=False)] for x in range(self.total_duration*self.num_to_test)]
+            self.spike_times = [[*np.random.choice(np.arange(0,self.sample_size), spk_per_timestep, replace=False)] for x in range(self.total_duration*self.num_to_test)]
         
         self.input_pop = self.sim.Population(self.sample_size, self.sim.SpikeSourceArray())
         self.input_pop.set(spike_times=self.spike_times)     
@@ -123,26 +120,26 @@ class RSNN_PyNN():
         ## PREDICTIONS
 
         out_spks_nope = self.spk_to_array(spiketrains_output)
-        out_spks = np.zeros((len(spiketrains_output),self.win*self.num_to_test))
+        self.out_spks = np.zeros((len(spiketrains_output),self.win*self.num_to_test))
 
         preds = []
         for x in range(self.num_to_test):
             a = x*self.win
             b = x*(self.win+self.next_sample_delay)
 
-            out_spks[:,a:a+self.win] = out_spks_nope[:,b:b+self.win]
+            self.out_spks[:,a:a+self.win] = out_spks_nope[:,b:b+self.win]
 
-            preds.append(out_spks[:,a:a+self.win].sum(axis=1).argmax())
-
+            preds.append(self.out_spks[:,a:a+self.win].sum(axis=1).argmax())
 
         print(self.label[self.inicio:self.inicio+self.num_to_test].argmax(axis=1))
 
         print(np.array(preds))
 
         acc = np.float(np.sum(np.array(preds) == self.label[self.inicio:self.inicio+self.num_to_test].argmax(axis=1)))
-        print('accuracy: ' +str(100*(acc/self.num_to_test)) + '%')        
+        print('accuracy: ' +str(100*(acc/self.num_to_test)) + '%')   
         
-
+        self.sim.end()
+        
     def project(self, weights, delay):           
         inh_synapses = []
         exc_synapses = []
@@ -169,8 +166,6 @@ class RSNN_PyNN():
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(inh_synapses), receptor_type='inhibitory')
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(exc_synapses), receptor_type='excitatory')     
 
-        
-
     def spk_count(self, spiketrain, start, end):
 
         spikecounts = np.zeros(len(spiketrain))
@@ -187,7 +182,71 @@ class RSNN_PyNN():
             for time in spk:
                 spks[neu_idx, int(time)-1] = 1
         return spks   
-    
+
+    def plot_save(self):
+
+        print('plotting....')
+
+        plots_folder = './results/spinn_'+self.name
+        if not os.path.exists(plots_folder):
+            os.makedirs(plots_folder)
+
+        #membranes_output = output_pop.get_data().segments[-1].filter(name='v')[0]
+        spiketrains_liquid = self.liquid_pop.get_data().segments[-1].spiketrains
+        #membranes_liquid = liquid_pop.get_data().segments[-1].filter(name='v')[0]
+        #spiketrains_input = input_pop.get_data().segments[-1].spiketrains    
+        #spiketrains_h = h_pop.get_data().segments[-1].spiketrains
+        #membranes_h = h_pop.get_data().segments[-1].filter(name='v')[0]  
+        #g_e = np.array(liquid_pop.get_data().segments[-1].filter(name='gsyn_exc')[0])
+        #g_i = np.array(liquid_pop.get_data().segments[-1].filter(name='gsyn_inh')[0])
+
+        # fig = plt.figure('input')
+        # plt.eventplot(spiketrains_input, linelengths=0.7, colors='k', label='pre_spikes') 
+        # plt.ylabel('Neuron index')
+        # plt.xlabel('Time (ms)') 
+        # for x in range(num_to_test-1):
+        #     plt.vlines(4+total_duration*(x+1), -1, sample_size, 'g', 'dashed')
+        # #fig.savefig('nest_last.png',dpi=300)
+        # plt.show()
+
+        fig = plt.figure('hidden', figsize=(15,10))
+        plt.eventplot(spiketrains_liquid, linelengths=0.7, colors='k', label='hidden_layer_spikes') 
+        plt.tick_params(labelsize=20)
+        plt.ylabel('Neuron index', fontsize= 30)
+        plt.xlabel('Time (ms)', fontsize= 30) 
+        for x in range(self.num_to_test-1):
+            plt.vlines(4+self.total_duration*(x+1), -1, self.n_h, 'g', 'dashed')
+        plt.savefig(plots_folder+'/hidden_spk.png',dpi=300)
+        #plt.savefig(plots_folder+'/hidden_spk.svg',dpi=600)
+        #plt.savefig(plots_folder+'/hidden_spk.pdf',dpi=600)
+        plt.show()
+
+        #mems_nope = np.array(membranes_liquid)
+        spks_nope = self.spk_to_array(spiketrains_liquid)
+
+        #mems = np.zeros((win*num_to_test,len(spiketrains_liquid)))
+        spks = np.zeros((len(spiketrains_liquid),self.win*self.num_to_test))
+
+        for x in range(self.num_to_test):
+            a = x*self.win
+            b = x*(self.win+self.next_sample_delay)
+            #mems[a:a+win,:] = mems_nope[b:b+win,:]
+            spks[:,a:a+self.win] = spks_nope[:,b:b+self.win]
+
+        #np.save(plots_folder+'/mems.npy', mems.T)
+        np.save(plots_folder+'/spks.npy', spks)
+
+        #means_n = spks.mean(axis=1)
+        means_t = spks.sum(axis=0)
+
+        plotname = '{}'.format(self.name)
+        plt.figure(figsize=(15,10))
+        plt.title('Recurrent layer activity per timestep, ' + plotname)
+        plt.plot(means_t, label='spikes')
+        #plt.plot(mems.mean(axis=1), label='avg membrane potential')
+        plt.xlabel('Time (ms)')
+        plt.legend()    
+        plt.savefig(plots_folder+'/mems_t.png',dpi=300)
     
 class RSNN_PyNN_split(RSNN_PyNN):
     
@@ -223,10 +282,4 @@ class RSNN_PyNN_split(RSNN_PyNN):
 
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(inh_synapses), receptor_type='inhibitory')
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(exc_synapses), receptor_type='excitatory')    
-    
-
-    
-    
-    
-
-    
+            
