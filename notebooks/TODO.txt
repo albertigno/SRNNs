@@ -1,26 +1,35 @@
 TODO:
-
-Fix GPU issue when saving model
+conf_matrix
 automatic creation and loading of grid for experiments?
 dropout
-conf_matrix
-srnn animation (almost there)
+add spike count to dataset loader
 sound to spike (cochlea model)
+conv layer (maybe create an abstract SNN model that encompasses common features with RNNs)
+one-to-one-layer
+deep architecture
+decorator for training_log
+assert or try for has_propagated of SRNN monitor
+use with TONIC
 
 DONE:
 spike regularization, spike count (ok)
 standardize plot_weights (ok)
+Fix GPU issue when saving model (ok)
+srnn animation (almost there) / try celluloid?
 
 LATER:
-corradi's delay model (for later)
-conv model as class (maybe create an abstract SNN model that encompasses common features with RNNs)
-
-
+dilated-conv-like delay model
 
 OTHER:
 marshalling dvs to frames -> matlab
 
-
 SPINNAKER:
-consistency of different responses to SHD for every size
+consistency of different responses to SHD for every size (hard)
 conv
+
+RESEARCH:
+review of training with delays
+forward propagation
+metrics for memory, synaptic operations in SNNs
+s-o-m
+spiketorch - SRM

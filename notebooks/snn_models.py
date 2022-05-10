@@ -14,6 +14,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.metrics import confusion_matrix
 
 class ActFun(torch.autograd.Function):
    
@@ -195,6 +196,29 @@ class RSNN(nn.Module):
         print('avg spk_count per neuron for all {} timesteps {}'.format(self.win, total_spk_count * (self.batch_size / total)))   
         print('Test Accuracy of the model on the test samples: %.3f' % (acc))
 
+    def conf_matrix(self, test_loader = None, labels = None, criterion=nn.MSELoss() ):
+        
+        self.save_model()
+        snn_cpu = RSNN() # copy of self, doing this to always evaluate on cpu
+        snn_cpu.load_model('rsnn', batch_size= self.batch_size)
+        
+        all_preds = list()
+        all_refs = list()
+        
+        for images, labels in test_loader:
+            images = images.float()
+            labels = labels.float()
+            outputs = snn_cpu(images)
+            spk_count = self.h_sumspike / (self.batch_size * self.num_hidden)
+            loss = criterion(outputs, labels)
+            _, predicted = torch.max(outputs.data, 1)
+            _, reference = torch.max(labels.data, 1)
+            
+            all_preds = all_preds + list(predicted.numpy())
+            all_refs = all_refs + list(reference.numpy())
+        
+        print(confusion_matrix(all_refs, all_preds))
+        
     def save_model(self, modelname = 'rsnn'):
 
         state = {

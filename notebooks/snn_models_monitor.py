@@ -12,6 +12,7 @@ from torch import Tensor
 import math
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.animation import FuncAnimation
 
 from snn_models import *
 
@@ -112,7 +113,7 @@ class RSNN_monitor(RSNN):
                 xlabel = 'Neuron'
                 ylabel = 'Time'                
 
-        fig = plt.figure(figsize=(20,10))
+        fig = plt.figure(figsize=(9,5))
 
         if plot_type=='normal':
             plt.imshow(data_to_plot, cmap=cmap, vmin=vmin, vmax=vmax)
@@ -153,16 +154,134 @@ class RSNN_monitor(RSNN):
         data_to_plot = data[:,sample_id][:,:, neuron_id].reshape((len(neuron_id) , self.win*len(sample_id)))      
         print(data_to_plot.shape)
         
-        fig = plt.figure(figsize=(20,10))
+        fig = plt.figure(figsize=(9,5))
         plt.plot(data_to_plot.T)
         
         plt.ylabel('Potential (mV)')
         plt.xlabel('Time (ms)')           
         
         return fig
-    
-    def animate_spikes(self):
-        pass
+
+    def animation(self, anim_frames=500, class_names = None):
+        
+        def square(num):
+            '''
+            get two closest factors of num so we can plot a vector of length num as an square-ish matrix
+            '''
+            factor1 = [x for x in range(1,num+1) if num%x==0 ]
+            factor2 = [int(num/x) for x in factor1]
+            idx = np.argmin(np.abs(np.array(factor2) - np.array(factor1)))
+            return factor1[idx], factor2[idx]    
+
+        xh, yh = square(self.num_hidden)
+
+        hidden_spk = self.all_h_spike.permute(1,0,2).flatten(0,1).view(-1, xh, yh).detach().cpu().numpy()
+        output_spk = self.all_o_spike.T.reshape(-1, anim_frames).detach().cpu().numpy()
+        #output_spk = self.all_o_spike.view(-1,self.num_output).detach().cpu().numpy()
+        
+        if self.dataset == 'nmnist':
+            num_channels = 2
+        else:
+            num_channels = 1
+            
+        ni = int(self.num_input / num_channels)
+        xx, yx = square(ni)
+
+        hidden_spk[0,0,0] = 1.0
+
+        fig = plt.figure(figsize=(9,5))
+
+        gs = fig.add_gridspec(2,3)
+
+        if num_channels==1:
+            ax1 = fig.add_subplot(gs[:, 0])
+            x_spk = self.all_x.permute(1,0,2).flatten(0,1).view(-1, xx, yx).detach().cpu().numpy()
+            x_spk[0,0,0] = 1.0
+            im_x = ax1.imshow(x_spk[0,:,:])
+        elif num_channels ==2:
+            ax1 = fig.add_subplot(gs[0, 0])
+            ax2 = fig.add_subplot(gs[1, 0])
+            ax2.axis('off')
+
+            x_spk_1 = self.all_x.permute(1,0,2).flatten(0,1)[:,:ni].view(-1, xx, yx).detach().cpu().numpy()
+            x_spk_2 = self.all_x.permute(1,0,2).flatten(0,1)[:,ni:].view(-1, xx, yx).detach().cpu().numpy()
+            #x_spk_1 = np.swapaxes(x_spk_1, 1,2)
+            #x_spk_2 = np.swapaxes(x_spk_2, 1,2)
+
+            x_spk_1[0,0,0] = 1.0 
+            x_spk_2[0,0,0] = 1.0
+            im_x_1 = ax1.imshow(x_spk_1[0,:,:])
+            im_x_2 = ax2.imshow(x_spk_2[0,:,:])
+        
+        ax1.axis('off')
+        ax3 = fig.add_subplot(gs[0, 1])
+        ax3.axis('off')
+        ax4 = fig.add_subplot(gs[1, 1])
+        
+        ax5 = fig.add_subplot(gs[:, 2])
+        ax5.axis('off')
+
+        ax5.set_ylim(0,self.num_output)
+
+        ax1.set_title('input spikes')
+        ax3.set_title('hidden spikes')
+        ax4.set_title('hidden spike count')
+        ax4.set_xlabel('time')
+        ax4.set_ylabel('number of spikes')
+        ax5.set_title('output spikes')
+        
+        r = 0.5
+        # class_names = ['em_stp', 'mv_ahd', 'mv_bk1', 'mv_bk2', 'sl_dwn', 'sa_eng', 'so_eng', 'st_ahd', 'tn_lft', 'tn_rht', 'none']
+        
+        if class_names == None:
+            class_names = list(range(self.num_output))
+        
+        for pos, name in enumerate(class_names):
+            ax5.annotate(str(name),(0.2, 0.4+ float(pos)))
+
+        circles = [plt.Circle((0.8, r + float(pos)), 0.2, edgecolor = 'k', facecolor = 'white') for pos in range(len(class_names))]    
+
+        for pos, circle in enumerate(circles):
+            ax5.add_artist(circle)
+
+        im_h = ax3.imshow(hidden_spk[0,:,:])
+        ax4.set_xlim(0,anim_frames)
+        ax4.set_ylim(0,int(self.num_hidden/3))
+        spk, = ax4.plot([])
+        avg_spk, = ax4.plot([])
+
+        t = np.arange(anim_frames)
+        spk_data = np.zeros(anim_frames)
+        avg_spk_data = np.zeros(anim_frames)
+
+        def animate(frame_num):
+
+            spk_data[frame_num] = hidden_spk[frame_num,:,:].sum()
+            avg_spk_data[frame_num] = spk_data[:frame_num].mean()
+
+            if num_channels==1:
+                im_x.set_data(x_spk[frame_num,:,:])
+            else:
+                im_x_1.set_data(x_spk_1[frame_num,:,:])
+                im_x_2.set_data(x_spk_2[frame_num,:,:])
+            im_h.set_data(hidden_spk[frame_num,:,:])
+            spk.set_data((t, spk_data))
+            avg_spk.set_data((t, avg_spk_data))
+            #im_h1.set_data(hidden_spk[t,:,:])    
+            #return (im_x, im_h)
+
+            for pos, circle in enumerate(circles):
+                if int(output_spk[pos, frame_num])==1:
+                    circle.set_facecolor('blue')
+                else:
+                    circle.set_facecolor('white')
+                    
+        anim = FuncAnimation(fig, animate, frames=anim_frames, interval=10)
+        
+        return anim
+        #plt.show()
+
+        
         
         
         
