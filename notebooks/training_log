@@ -105,3 +105,4 @@ Finished training 50 epochs for shd_rnn_1024_delay_r.t7, batch_size 180, time_pe
 Finished training 50 epochs for shd_rnn_2048_r.t7, batch_size 180, time_per_epoch 4.6170713901519775 s
 Finished training 50 epochs for shd_rnn_2048_delay_r.t7, batch_size 180, time_per_epoch 5.655855655670166 s
 Finished training 50 epochs for shd_rnn_256_delay_r.t7, batch_size 180, time_per_epoch 4.280156373977661 s
+Finished training 20 epochs for shd_rnn_512_0.8305.t7, batch_size 256, time_per_epoch 51.03196382522583 s

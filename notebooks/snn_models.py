@@ -70,7 +70,7 @@ class RSNN(nn.Module):
             nn.init.normal_(self.tau_m_o, 0.83, 0.1)
 
         self.acc = list() # stores accuracy every time test() is called
-        self.h_sumspike = torch.tensor(0.0) # for spike-regularization
+        
         self.train_loss = list()
         self.test_loss = list()
         self.test_spk_count = list()
@@ -86,7 +86,8 @@ class RSNN(nn.Module):
         
         h_mem = h_spike = torch.zeros(self.batch_size, self.num_hidden, device=self.device)
         o_mem = o_spike = o_sumspike = torch.zeros(self.batch_size, self.num_output, device=self.device)
-            
+        self.h_sumspike = torch.tensor(0.0) # for spike-regularization
+        
         for step in range(self.win):
 
             x = input[:, step, :]
