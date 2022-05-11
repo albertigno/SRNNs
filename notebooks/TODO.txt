@@ -1,5 +1,4 @@
 TODO:
-conf_matrix
 automatic creation and loading of grid for experiments?
 dropout
 add spike count to dataset loader
@@ -16,6 +15,7 @@ spike regularization, spike count (ok)
 standardize plot_weights (ok)
 Fix GPU issue when saving model (ok)
 srnn animation (almost there) / try celluloid?
+conf_matrix (make more pretty)
 
 LATER:
 dilated-conv-like delay model
