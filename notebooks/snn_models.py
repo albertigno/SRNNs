@@ -168,7 +168,7 @@ class RSNN(nn.Module):
             images = images.float()
             labels = labels.float()
             outputs = snn_cpu(images)
-            spk_count = self.h_sumspike / (self.batch_size * self.num_hidden)
+            spk_count = snn_cpu.h_sumspike / (self.batch_size * self.num_hidden)
             loss = criterion(outputs, labels)
             _, predicted = torch.max(outputs.data, 1)
             _, reference = torch.max(labels.data, 1)
@@ -197,6 +197,46 @@ class RSNN(nn.Module):
         print('avg spk_count per neuron for all {} timesteps {}'.format(self.win, total_spk_count * (self.batch_size / total)))   
         print('Test Accuracy of the model on the test samples: %.3f' % (acc))
 
+    def test_gpu(self, test_loader = None, criterion=None):
+        
+        correct = 0
+        total = 0
+        total_loss_test = 0
+        total_spk_count = 0
+
+        for images, labels in test_loader:
+            images = images.float()
+            labels = labels.float()
+            outputs = self(images)
+            spk_count = self.h_sumspike / (self.batch_size * self.num_hidden)
+            loss = criterion(outputs, labels)
+            _, predicted = torch.max(outputs.data, 1)
+            _, reference = torch.max(labels.data, 1)
+            total += labels.size(0)
+            correct += (predicted == reference).sum()
+            total_loss_test += loss.item() 
+            total_spk_count += spk_count
+            
+        acc = 100. * float(correct) / float(total)
+        
+        # try to improve this
+        if self.acc == []:
+            self.acc.append([self.epoch, acc]) 
+            self.test_loss.append([self.epoch, total_loss_test / total])
+        else:
+            if self.acc[-1][0] < self.epoch:
+                self.acc.append([self.epoch, acc]) 
+                self.test_loss.append([self.epoch, total_loss_test / total])               
+
+        if self.test_spk_count == []:
+            self.test_spk_count.append([self.epoch, total_spk_count * (self.batch_size / total)]) 
+        else:
+            if self.test_spk_count[-1][0] < self.epoch:
+                self.test_spk_count.append([self.epoch, total_spk_count * (self.batch_size / total)])                 
+                
+        print('avg spk_count per neuron for all {} timesteps {}'.format(self.win, total_spk_count * (self.batch_size / total)))   
+        print('Test Accuracy of the model on the test samples: %.3f' % (acc))
+        
     def conf_matrix(self, test_loader = None, labels = None, criterion=nn.MSELoss() ):
         
         self.save_model()

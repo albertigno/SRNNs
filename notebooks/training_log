@@ -106,3 +106,13 @@ Finished training 50 epochs for shd_rnn_2048_r.t7, batch_size 180, time_per_epoc
 Finished training 50 epochs for shd_rnn_2048_delay_r.t7, batch_size 180, time_per_epoch 5.655855655670166 s
 Finished training 50 epochs for shd_rnn_256_delay_r.t7, batch_size 180, time_per_epoch 4.280156373977661 s
 Finished training 20 epochs for shd_rnn_512_0.8305.t7, batch_size 256, time_per_epoch 51.03196382522583 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 11.407450914382935 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 12.34418773651123 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 12.100406646728516 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 12.320369482040405 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 11.709791421890259 s
+Finished training 10 epochs for nmnist_rnn_256_wta.t7, batch_size 200, time_per_epoch 11.97111964225769 s
+Finished training 10 epochs for nmnist_rnn_1024_wta.t7, batch_size 200, time_per_epoch 13.06029486656189 s
+Finished training 10 epochs for nmnist_rnn_1024_wta.t7, batch_size 200, time_per_epoch 13.290169715881348 s
+Finished training 10 epochs for nmnist_rnn_1024_wta.t7, batch_size 200, time_per_epoch 13.925407648086548 s
+Finished training 10 epochs for nmnist_rnn_1024_wta.t7, batch_size 200, time_per_epoch 15.45300006866455 s

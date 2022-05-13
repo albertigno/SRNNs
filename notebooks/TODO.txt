@@ -1,4 +1,5 @@
 TODO:
+Try Truncated BPTT
 automatic creation and loading of grid for experiments?
 dropout
 add spike count to dataset loader
@@ -21,7 +22,8 @@ LATER:
 dilated-conv-like delay model
 
 OTHER:
-marshalling dvs to frames -> matlab
+marshalling dvs to frames -> matlab (ok)
+marshalling dataset equilibrado
 
 SPINNAKER:
 consistency of different responses to SHD for every size (hard)
@@ -33,3 +35,4 @@ forward propagation
 metrics for memory, synaptic operations in SNNs
 s-o-m
 spiketorch - SRM
+time surfaces
