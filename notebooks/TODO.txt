@@ -1,0 +1,38 @@
+TODO:
+Try Truncated BPTT
+automatic creation and loading of grid for experiments?
+dropout
+add spike count to dataset loader
+sound to spike (cochlea model)
+conv layer (maybe create an abstract SNN model that encompasses common features with RNNs)
+one-to-one-layer
+deep architecture
+decorator for training_log
+assert or try for has_propagated of SRNN monitor
+use with TONIC
+
+DONE:
+spike regularization, spike count (ok)
+standardize plot_weights (ok)
+Fix GPU issue when saving model (ok)
+srnn animation (almost there) / try celluloid?
+conf_matrix (make more pretty)
+
+LATER:
+dilated-conv-like delay model
+
+OTHER:
+marshalling dvs to frames -> matlab (ok)
+marshalling dataset equilibrado
+
+SPINNAKER:
+consistency of different responses to SHD for every size (hard)
+conv
+
+RESEARCH:
+review of training with delays
+forward propagation
+metrics for memory, synaptic operations in SNNs
+s-o-m
+spiketorch - SRM
+time surfaces
