@@ -20,15 +20,11 @@ class RSNN_PyNN():
         self.name = dataset +'_' +modelname
         self.timestep = timestep
         self.num_to_test = num_to_test
-        self.sim.setup(timestep, min_delay=1.0, max_delay=2.0)
-       
-        weights = []
-        weights_path = './../notebooks/checkpoint/'+self.name
-        weights.append(np.load(weights_path+'fc_ih.weight.npz')['arr_0'])
-        weights.append(np.load(weights_path+'fc_hh.weight.npz')['arr_0'])
-        weights.append(np.load(weights_path+'fc_ho.weight.npz')['arr_0'])     
-        
-        self.n_h = len(weights[0])
+        self.sim.setup(timestep, min_delay=1.0, max_delay=16.0)
+              
+        self.weights = self.load_weights() 
+               
+        self.n_h = len(self.weights[1])
              
         if dataset=='shd':
             self.win = 50
@@ -72,8 +68,8 @@ class RSNN_PyNN():
         cellparams = {'v_thresh': v_th, 'v_reset': 0.0, 'v_rest': 0.0, 'e_rev_E': e_rev, 'e_rev_I': -e_rev, 'i_offset': 0.0,
                       'cm': cm/q, 'tau_m': 0.8305, 'tau_syn_E': tau_syn, 'tau_syn_I': tau_syn, 'tau_refrac': 0.0}
 
-        self.liquid_pop = self.sim.Population(len(weights[0]), self.sim.IF_cond_exp(**cellparams))
-        self.output_pop = self.sim.Population(len(weights[-1]), self.sim.IF_cond_exp(**cellparams))    
+        self.liquid_pop = self.sim.Population(self.n_h, self.sim.IF_cond_exp(**cellparams))
+        self.output_pop = self.sim.Population(len(self.weights[-1]), self.sim.IF_cond_exp(**cellparams))    
 
         i_o = 0.7
         cellparams_h = {'v_thresh': v_th_h, 'v_reset': 0.0, 'v_rest': 0.0, 'e_rev_E': 0.1, 'e_rev_I': -v_th, 'i_offset': i_o,
@@ -92,8 +88,10 @@ class RSNN_PyNN():
                             receptor_type='inhibitory')
 
         self.set_input_population()
-        self.connect(weights, delay=1.0)
+        self.connect()
 
+        return
+        
         self.liquid_pop.initialize(**cellvalues)
         self.output_pop.initialize(**cellvalues)    
         h_pop.initialize(v=off) 
@@ -102,7 +100,17 @@ class RSNN_PyNN():
         
         if record_hidden:
             self.liquid_pop.record(['spikes'])
+
+    def load_weights(self):
+    
+        weights = []
+        weights_path = './models/'+self.name
+        weights.append(np.load(weights_path+'fc_ih.weight.npz')['arr_0'])
+        weights.append(np.load(weights_path+'fc_hh.weight.npz')['arr_0'])
+        weights.append(np.load(weights_path+'fc_ho.weight.npz')['arr_0'])    
         
+        return weights
+                    
     def set_input_population(self, spk_per_timestep=None): 
         
         if spk_per_timestep is not None:
@@ -151,15 +159,17 @@ class RSNN_PyNN():
                 else:
                     exc_synapses.append([i, j, weights[j, i], delay]) 
                     
-        return  inh_synapses, exc_synapses
-
-    def connect(self, weights, delay):
+        return  inh_synapses, exc_synapses    
+    
+    def connect(self):
      
+        delay = 1.0 
+    
         pops = [self.input_pop, self.liquid_pop, self.liquid_pop, self.output_pop]
 
-        for layer in range(len(weights)):
+        for layer in range(len(self.weights)):
             
-            w = weights[layer]
+            w = self.weights[layer]
             
             inh_synapses, exc_synapses = self.project(w, delay)
 
@@ -282,4 +292,62 @@ class RSNN_PyNN_split(RSNN_PyNN):
 
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(inh_synapses), receptor_type='inhibitory')
             self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(exc_synapses), receptor_type='excitatory')    
+            
+            
+class RSNN_d(RSNN_PyNN):
+    
+    def load_weights(self):
+    
+        weights = [[None, None, None], None, None]
+        weights_path = './models/'+self.name
+        weights[0][0] = np.load(weights_path+'fc_ih_0.weight.npz')['arr_0']
+        weights[0][1] = np.load(weights_path+'fc_ih_2.weight.npz')['arr_0']
+        weights[0][2] = np.load(weights_path+'fc_ih_4.weight.npz')['arr_0']
+        weights[1] = np.load(weights_path+'fc_hh.weight.npz')['arr_0']
+        weights[2] = np.load(weights_path+'fc_ho.weight.npz')['arr_0']    
+        
+        return weights
+    
+    def project(self, weights, delay):           
+        inh_synapses = []
+        exc_synapses = []
+        
+        delays = [1.0,5.0,10.0]
+
+        if len(weights)==3:
+            print('projecting ih weights...')
+            for wi, w in enumerate(weights):
+                for i in range(w.shape[1]):
+                    for j in range(w.shape[0]):
+                        if float(w[j, i]) != 0.0:
+                            if float(w[j, i])<0.0:
+                                inh_synapses.append([i, j, -1.0*w[j, i], delays[wi]])
+                            else:
+                                exc_synapses.append([i, j, w[j, i], delays[wi]])  
+        else:
+            print('projecting hh, ho weights')
+            for i in range(weights.shape[1]):
+                for j in range(weights.shape[0]):
+                    if float(weights[j, i])<0.0:
+                        inh_synapses.append([i, j, -1.0*weights[j, i], delay])
+                    else:
+                        exc_synapses.append([i, j, weights[j, i], delay]) 
+                    
+        return  inh_synapses, exc_synapses    
+    
+    def connect(self):
+        
+        delay = 1.0
+     
+        pops = [self.input_pop, self.liquid_pop, self.liquid_pop, self.output_pop]
+
+        for layer in range(len(self.weights)):
+            
+            w = self.weights[layer]
+            
+            inh_synapses, exc_synapses = self.project(w, delay)
+
+            self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(inh_synapses), receptor_type='inhibitory')
+            self.sim.Projection(pops[layer],pops[layer+1], connector=self.sim.FromListConnector(exc_synapses), receptor_type='excitatory')       
+    
             
